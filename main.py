@@ -152,12 +152,13 @@ class MTCNNMain:
 
 
     def train_pnet(self):
-        pnet = PNet()
-        pnet.buildModel()
-        weight_data = MTCNNUtil.loadWeights("initial_weights/initial_weight_pnet.npy")
-        MTCNNUtil.setWeights(weight_data,pnet.model,use_dict=False)
-        path = "/Users/gurushant/12/{0}"
-        dataset_cls = pnet.readRecordDataSet(path=[
+        self.pnet_model = PNet()
+        self.pnet_model.buildModel()
+        #self.pnet_model.model.load_weights("/mnt/disks/sdb/MTCNN/2000/12")
+        #weight_data = MTCNNUtil.loadWeights("initial_weights/initial_weight_pnet.npy")
+        #MTCNNUtil.setWeights(weight_data,pnet.model,use_dict=False)
+        path = "/mnt/disks/sdb/MTCNN/12/{0}"
+        dataset_cls = self.pnet_model.readRecordDataSet(path=[
                                                 path.format("dataset_cls_12_0.tf"),
                                                 path.format("dataset_cls_12_1.tf"),
                                                 path.format("dataset_cls_12_2.tf"),
@@ -165,7 +166,7 @@ class MTCNNMain:
                                                 path.format("dataset_cls_12_4.tf"),
                                                 path.format("dataset_cls_12_5.tf")
                                                 ])
-        pnet.train(100,dataset_cls,dataset_cls)
+        self.pnet_model.train(10000,dataset_cls,dataset_cls)
 
 
 m = MTCNNMain("/Users/gurushant/Desktop/modi_cabinet.jpg")

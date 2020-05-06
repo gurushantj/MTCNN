@@ -82,10 +82,18 @@ class PNet:
     def epoch(self, input, clsLabel, bbLabel, losses, trainPart):
         batch = input.shape[0]
         input = tf.reshape(input, [batch, 12, 12, 3])
+        input = tf.image.random_flip_left_right(input)
+        input = tf.image.random_flip_up_down(input)
         clsLabel = tf.reshape(clsLabel, [batch, 1, 1, 2])
+        bbLabel = tf.reshape(bbLabel, [batch, 1, 1, 4])
+        mask = tf.not_equal(tf.reduce_sum(bbLabel, axis=-1), 0)
+
         with tf.GradientTape() as tape:
             output = self.model(input)
-            loss = tf.case([(tf.equal(trainPart, 0), lambda: self.crossEntropyLoss(output[0], clsLabel)),
+            output[1] = tf.boolean_mask(output[1], mask)
+            bbLabel = tf.boolean_mask(bbLabel, mask)
+
+            loss = tf.case([(tf.equal(trainPart, 0), lambda: self.crossEntropyLoss(clsLabel,output[0])),
                             (tf.equal(trainPart, 1), lambda: self.meanSqrdLoss(output[1], bbLabel))
                             ], exclusive=True)
             clsLoss = tf.case(
@@ -123,7 +131,7 @@ class PNet:
         dataset = tf.data.Dataset.from_tensor_slices(path)
         dataset = dataset.interleave(lambda x: tf.data.TFRecordDataset(x),
                                      num_parallel_calls=tf.data.experimental.AUTOTUNE).cache()
-        dataset = dataset.shuffle(buffer_size=1024).batch(1024).prefetch(4).map(self._parseDataset,
+        dataset = dataset.shuffle(buffer_size=9216).batch(9216).prefetch(4).map(self._parseDataset,
                                                                                 num_parallel_calls=tf.data.experimental.AUTOTUNE).cache()
         return dataset
 
@@ -166,7 +174,7 @@ class PNet:
                                                self.bbLoss.result(), self.trainBBAcc.result(),
                                                epoch_execution_time, (data_reading_end_time - data_reading_start_time)))
 
-            if i % 500 == 0:
+            if i % 1000 == 0:
                 with self.trainFileWriter.as_default():
                     tf.summary.scalar("BB Loss", self.bbLoss.result(), i)
                     tf.summary.scalar("CLS Loss", self.clsLoss.result(), i)
