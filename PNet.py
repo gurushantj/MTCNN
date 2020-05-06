@@ -150,16 +150,12 @@ class PNet:
 
             for image, label, boundingBoxLabel in dataset_cls:
                 randNum = np.random.randint(0, 2)
-                randNum = 0
                 batch_count += 1
                 start_epoch_time = time.time()
-                # if i == 95:
-                #     print("epuch")
                 batch = image.shape[0]
                 l2 = self.model.get_layer("conv3").losses[0]
                 l3 = self.model.get_layer("conv4-1").losses[0]
                 l4 = self.model.get_layer("conv4-2").losses[0]
-                # randNum=1
                 gradient = self.epoch(tf.constant(image), tf.constant(label), tf.constant(boundingBoxLabel),
                                       tf.stack([l2, l3, l4]),
                                       tf.constant(randNum))
