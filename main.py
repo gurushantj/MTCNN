@@ -4,29 +4,33 @@ import cv2
 import numpy as np
 
 from RNet import RNet
-from mtcnn_util.mtcnn_util import MTCNNUtil
+from mtcnn_util.mtcnn_util import MTCNNUtil, Mode
 
 
 class MTCNNMain:
-    def __init__(self,img_path):
+    def __init__(self,img_path,mode):
         pnet = PNet()
         pnet.buildModel()
-        weight_data = MTCNNUtil.loadWeights("weights/mtcnn_pnet.npy")
-        MTCNNUtil.setWeights(weight_data,pnet.model)
         self.pnet_model = pnet
 
         rnet = RNet()
         rnet.build_model()
-        weight_data = MTCNNUtil.loadWeights("weights/mtcnn_rnet.npy")
-        MTCNNUtil.setWeights(weight_data, rnet.model)
         self.rnet_model = rnet
 
         onet = ONet()
         onet.build_model()
-        weight_data = MTCNNUtil.loadWeights("weights/mtcnn_onet.npy")
-        MTCNNUtil.setWeights(weight_data, onet.model)
+
         self.onet_model = onet
         self.img_path = img_path
+
+        if mode == Mode.TESTING.value:
+            weight_data = MTCNNUtil.loadWeights("weights/mtcnn_onet.npy")
+            MTCNNUtil.setWeights(weight_data, onet.model)
+            weight_data = MTCNNUtil.loadWeights("weights/mtcnn_pnet.npy")
+            MTCNNUtil.setWeights(weight_data,pnet.model)
+            weight_data = MTCNNUtil.loadWeights("weights/mtcnn_rnet.npy")
+            MTCNNUtil.setWeights(weight_data, rnet.model)
+
 
     def detect_faces(self,minsize=20,factor=0.7):
         img = cv2.imread(self.img_path)
@@ -151,25 +155,36 @@ class MTCNNMain:
         cv2.imwrite(save_path, img)
 
 
-    def train_pnet(self):
-        self.pnet_model = PNet()
-        self.pnet_model.buildModel()
+    def train_pnet(self,path):
         #self.pnet_model.model.load_weights("/mnt/disks/sdb/MTCNN/2000/12")
         #weight_data = MTCNNUtil.loadWeights("initial_weights/initial_weight_pnet.npy")
         #MTCNNUtil.setWeights(weight_data,pnet.model,use_dict=False)
-        path = "/mnt/disks/sdb/MTCNN/12/{0}"
-        dataset_cls = self.pnet_model.readRecordDataSet(path=[
-                                                path.format("dataset_cls_12_0.tf"),
-                                                path.format("dataset_cls_12_1.tf"),
-                                                path.format("dataset_cls_12_2.tf"),
-                                                path.format("dataset_cls_12_3.tf"),
-                                                path.format("dataset_cls_12_4.tf"),
-                                                path.format("dataset_cls_12_5.tf")
-                                                ])
+        file_list = MTCNNUtil.get_files(path)
+        dataset_cls = self.pnet_model.readRecordDataSet(path=file_list)
         self.pnet_model.train(10000,dataset_cls,dataset_cls)
 
 
-m = MTCNNMain("/Users/gurushant/Desktop/modi_cabinet.jpg")
+    def train_rnet(self,path):
+        #self.pnet_model.model.load_weights("/mnt/disks/sdb/MTCNN/2000/12")
+        #weight_data = MTCNNUtil.loadWeights("initial_weights/initial_weight_pnet.npy")
+        #MTCNNUtil.setWeights(weight_data,pnet.model,use_dict=False)
+        file_list = MTCNNUtil.get_files(path)
+        dataset_cls = self.rnet_model.readRecordDataSet(path=file_list)
+        self.rnet_model.train(10000,dataset_cls)
+
+
+    def train_onet(self,path):
+        #self.pnet_model.model.load_weights("/mnt/disks/sdb/MTCNN/2000/12")
+        #weight_data = MTCNNUtil.loadWeights("initial_weights/initial_weight_pnet.npy")
+        #MTCNNUtil.setWeights(weight_data,pnet.model,use_dict=False)
+        file_list = MTCNNUtil.get_files(path)
+        dataset_cls = self.onet_model.readRecordDataSet(path=file_list)
+        self.onet_model.train(10000,dataset_cls)
+
+
+
+
+m = MTCNNMain("/Users/gurushant/Desktop/modi_cabinet.jpg",mode=Mode.TRAINING.value)
 # boxes = m.detect_faces()
 # m.draw_square(boxes,save_path="/Users/gurushant/Desktop/modi_cabinet_result.jpg")
-m.train_pnet()
+m.train_pnet("/mnt/disks/sdb/MTCNN/48")

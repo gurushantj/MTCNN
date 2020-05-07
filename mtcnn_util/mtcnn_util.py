@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 
 from Constants import WEIGHT_DECAY
+from enum import Enum
+import os
 
 
 class MTCNNUtil:
@@ -174,8 +176,29 @@ class MTCNNUtil:
             except Exception as exp:
                 raise exp
 
-    def saveModel(self,path="model/12"):
-        self.model.save(path)
 
-    def saveModelWts(self,path="model_wt/"):
-        self.model.save_weights(path)
+
+    @staticmethod
+    def get_files(path):
+        file_list = []
+        for _,_,files in os.walk(path):
+            for i in range(len(files)):
+                file_list.append(os.path.join(path,files[i]))
+
+        return file_list
+
+
+
+
+MTCNNUtil.get_files("/Users/gurushant/PycharmProjects/MTCNN/weights")
+
+class Mode(Enum):
+    TRAINING = 0
+    TESTING = 1
+
+    @staticmethod
+    def getMode(mode):
+        return {
+                Mode.TRAINING:"TRAINING",
+                Mode.TESTING: "TESTING"
+        }[mode]
