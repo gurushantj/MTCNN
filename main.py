@@ -27,7 +27,7 @@ class MTCNNMain:
         if mode == Mode.TESTING.value:
             weight_data = MTCNNUtil.loadWeights("weights/mtcnn_pnet.npy")
             # MTCNNUtil.setWeights(weight_data,pnet.model)
-            pnet.model = tf.keras.models.load_model("/Users/gurushant/model/2000/12")
+            pnet.model = tf.keras.models.load_model("/Users/gurushant/model/4000/12")
 
             weight_data = MTCNNUtil.loadWeights("weights/mtcnn_rnet.npy")
             MTCNNUtil.setWeights(weight_data, rnet.model)
@@ -59,6 +59,12 @@ class MTCNNMain:
             im_data = (im_data - 127.5) * (1. / 128.0)
             img_x = np.expand_dims(im_data, 0)
             out = self.pnet_model.model.predict(img_x)
+
+            tmp = out[0]
+            tmp = tmp[0]
+            tmp = np.where(tmp[:,:,1] >= 0.8)
+            print(tmp)
+
             out0 = out[0]
             tmp = np.transpose(out0[0, :, :, 1])
             boxes = MTCNNUtil.genrate_bb(out,threshold=0.8,scale=scale)
@@ -147,12 +153,13 @@ class MTCNNMain:
     def preprocess_image(self,im_data):
         return (im_data - 127.5) * (1. / 128.0)
 
-    def generate_hard_12(self):
+    def generate_hard_negative_pnet_12(self):
         threshold = 0.6
         minsize = 20
         factor = 0.709
+        image_size = 12
+
         self.pnet_model.model = tf.keras.models.load_model("/Users/gurushant/model/2000/12")
-        image_size = 24
         save_dir = DATASET_SAVE_DIR+str(image_size)
         anno_file = 'wider_face_train.txt'
 
@@ -168,9 +175,9 @@ class MTCNNMain:
         if not os.path.exists(neg_save_dir):
             os.mkdir(neg_save_dir)
 
-        f1 = open(save_dir + '/pos_24.txt', 'w')
-        f2 = open(save_dir + '/neg_24.txt', 'w')
-        f3 = open(save_dir + '/part_24.txt', 'w')
+        f1 = open(save_dir + '/pos_{0}.txt'.format(image_size), 'a')
+        f2 = open(save_dir + '/neg_{0}.txt'.format(image_size), 'a')
+        f3 = open(save_dir + '/part_{0}.txt'.format(image_size), 'a')
 
         with open(anno_file, 'r') as f:
             annotations = f.readlines()
@@ -190,7 +197,9 @@ class MTCNNMain:
         def pnet(img):
             return model.predict(img)
 
+        total = 0
         for line in annotation_lines:
+            print(line)
             line = line.split()
             img_path = TRAINING_DATA_SOURCE_PATH+line[0]+".jpg"
             img = cv2.imread(img_path)
@@ -202,17 +211,19 @@ class MTCNNMain:
             # cv2.imshow("test",img)
             # cv2.waitKey()
             for box in rects:
+                total += 1
                 box[box < 0] = 0
                 box = box.astype(np.int32)
                 # print(box[2]-box[0])
                 # print(box[3]-box[1])
-                if (box[2]-box[0]) < 15 or (box[3]-box[1]) < 15:
-                    continue
                 x_left, y_top, x_right, y_bottom, _ = box
                 crop_w = x_right - x_left + 1
                 crop_h = y_bottom - y_top + 1
                 # ignore box that is too small or beyond image border
                 if crop_w < image_size or crop_h < image_size:
+                    continue
+
+                if y_top < 0 or y_bottom > img.shape[0] or x_left < 0 or x_right > img.shape[1]:
                     continue
 
                 iou = MTCNNUtil.iou(box,boxes)
@@ -305,9 +316,9 @@ class MTCNNMain:
 
 
 
-path = "/Users/gurushant/Downloads/WIDER_train/images/0--Parade/0_Parade_marchingband_1_849.jpg"
+path = "/Users/gurushant/Downloads/jeevan.jpg"
 m = MTCNNMain(path,mode=Mode.TESTING.value)
-m.generate_hard_12()
+m.generate_hard_negative_pnet_12()
 # boxes = m.detect_faces()
 # if boxes.size == 0 :
 #     print("No face found")
