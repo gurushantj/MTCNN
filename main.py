@@ -1,8 +1,9 @@
+from Constants import TRAINING_DATA_SOURCE_PATH
 from ONet import ONet
 from PNet import PNet
 import cv2
 import numpy as np
-
+import tensorflow as tf
 from RNet import RNet
 from mtcnn_util.mtcnn_util import MTCNNUtil, Mode
 
@@ -24,12 +25,14 @@ class MTCNNMain:
         self.img_path = img_path
 
         if mode == Mode.TESTING.value:
-            weight_data = MTCNNUtil.loadWeights("weights/mtcnn_onet.npy")
-            MTCNNUtil.setWeights(weight_data, onet.model)
             weight_data = MTCNNUtil.loadWeights("weights/mtcnn_pnet.npy")
-            MTCNNUtil.setWeights(weight_data,pnet.model)
+            # MTCNNUtil.setWeights(weight_data,pnet.model)
+            pnet.model = tf.keras.models.load_model("/Users/gurushant/model/9000/12")
+
             weight_data = MTCNNUtil.loadWeights("weights/mtcnn_rnet.npy")
             MTCNNUtil.setWeights(weight_data, rnet.model)
+            weight_data = MTCNNUtil.loadWeights("weights/mtcnn_onet.npy")
+            MTCNNUtil.setWeights(weight_data, onet.model)
 
 
     def detect_faces(self,minsize=20,factor=0.7):
@@ -98,7 +101,7 @@ class MTCNNMain:
             out0 = np.transpose(out[0])
             out1 = np.transpose(out[1])
             score = out0[1, :]
-            ipass = np.where(score > 0.8)
+            ipass = np.where(score >= 0.8)
             total_boxes = np.hstack([total_boxes[ipass[0], 0:4].copy(),
                                      np.expand_dims(score[ipass].copy(), 1)])
             mv = out1[:, ipass[0]]
@@ -141,6 +144,44 @@ class MTCNNMain:
                 total_boxes = total_boxes[pick, :]
             return total_boxes
 
+    def preprocess_image(self,im_data):
+        return (im_data - 127.5) * (1. / 128.0)
+
+    def generate_hard_12(self):
+        image_size = 24
+        threshold = 0.6
+        minsize = 20
+        factor = 0.709
+        self.pnet_model.model = tf.keras.models.load_model("/Users/gurushant/model/9000/12")
+
+        model = self.pnet_model.model
+        with open("wider_face_train.txt","r") as file:
+            annotation_lines = file.readlines()
+
+        def pnet(img):
+            return model.predict(img)
+
+        for line in annotation_lines:
+            line = line.split()
+            img_path = TRAINING_DATA_SOURCE_PATH+line[0]+".jpg"
+            img = cv2.imread(img_path)
+            rects = MTCNNUtil.detect_face_12net(img,minsize,pnet,threshold,factor)
+            boxes = np.reshape(line[1:],newshape=(-1,4))
+            boxes = boxes.astype(np.float64)
+            # cv2.rectangle(img,(452,421),(468,440),(0,0,255),2)
+            # cv2.rectangle(img,(448,329),(570,478),(0,255,0),2)
+            # cv2.imshow("test",img)
+            # cv2.waitKey()
+            for box in boxes:
+                box[box < 0] = 0
+                if (box[2]-box[0]) < image_size or (box[3]-box[1]) < image_size:
+                    continue
+                iou = MTCNNUtil.iou(box,rects)
+                print(np.where(iou > threshold))
+
+
+
+
 
     def draw_square(self,rectangle_list,save_path="."):
         img = cv2.imread(self.img_path)
@@ -159,6 +200,7 @@ class MTCNNMain:
         #self.pnet_model.model.load_weights("/mnt/disks/sdb/MTCNN/2000/12")
         #weight_data = MTCNNUtil.loadWeights("initial_weights/initial_weight_pnet.npy")
         #MTCNNUtil.setWeights(weight_data,pnet.model,use_dict=False)
+        self.pnet_model.model.load_model("/Users/gurushant/model/9000/12")
         file_list = MTCNNUtil.get_files(path)
         dataset_cls = self.pnet_model.readRecordDataSet(path=file_list)
         self.pnet_model.train(10000,dataset_cls,dataset_cls)
@@ -184,7 +226,9 @@ class MTCNNMain:
 
 
 
-m = MTCNNMain("/Users/gurushant/Desktop/modi_cabinet.jpg",mode=Mode.TRAINING.value)
-# boxes = m.detect_faces()
-# m.draw_square(boxes,save_path="/Users/gurushant/Desktop/modi_cabinet_result.jpg")
-m.train_pnet("/mnt/disks/sdb/MTCNN/48")
+path = "/Users/gurushant/Downloads/WIDER_train/images/4--Dancing/4_Dancing_Dancing_4_786.jpg"
+m = MTCNNMain(path,mode=Mode.TESTING.value)
+# m.generate_hard_12()
+boxes = m.detect_faces()
+m.draw_square(boxes,save_path="/Users/gurushant/Desktop/band.jpg")
+# m.train_pnet("/mnt/disks/sdb/MTCNN/48")

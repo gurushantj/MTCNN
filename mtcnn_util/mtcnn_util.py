@@ -4,6 +4,7 @@ import tensorflow as tf
 from Constants import WEIGHT_DECAY
 from enum import Enum
 import os
+import cv2
 
 
 class MTCNNUtil:
@@ -57,6 +58,53 @@ class MTCNNUtil:
         b4 = boundingbox[:, 3] + reg[:, 3] * h
         boundingbox[:, 0:4] = np.transpose(np.vstack([b1, b2, b3, b4]))
         return boundingbox
+
+    # @staticmethod
+    # def iou(box,boxes):
+    #     x1 = boxes[:,0]
+    #     y1 = boxes[:,1]
+    #     x2 = boxes[:,2]
+    #     y2 = boxes[:,3]
+        x1 = boxes[0]
+        y1 = boxes[1]
+        x2 = boxes[2]
+        y2 = boxes[3]
+        #
+        # width = x2-x1
+        # height = y2-y1
+        # width = np.maximum(width,1)
+        # height = np.maximum(height,1)
+        # area = width*height
+        # box_area = np.maximum((box[2]-box[0]),1)*np.maximum((box[3]-box[1]),1)
+        # nx1 = np.maximum(box[0],x1)
+        # ny1 = np.maximum(box[1],y1)
+        # nx2 = np.minimum(box[2], x2)
+        # ny2 = np.minimum(box[3], y2)
+        #
+        # min_area = np.minimum(area,box_area)
+        #
+        # inter_area = (nx2-nx1)*(ny2-ny1)
+        inter_area[inter_area < 0] = 0
+        # iou = inter_area/(box_area+min_area-inter_area)
+        # return iou
+    #
+    @staticmethod
+    def iou(box, boxes):
+        box_area = (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
+        area = (boxes[:, 2] - boxes[:, 0] + 1) * (boxes[:, 3] - boxes[:, 1] + 1)
+        xx1 = np.maximum(box[0], boxes[:, 0])
+        yy1 = np.maximum(box[1], boxes[:, 1])
+        xx2 = np.minimum(box[2], boxes[:, 2])
+        yy2 = np.minimum(box[3], boxes[:, 3])
+
+        # compute the width and height of the bounding box
+        w = np.maximum(0, xx2 - xx1 + 1)
+        h = np.maximum(0, yy2 - yy1 + 1)
+
+        inter = w * h
+        ovr = inter / (box_area + area - inter)
+        # ovr = inter / (2 * area - inter)
+        return ovr
 
     @staticmethod
     def nms(boxes,threshold,method="UNION"):
@@ -186,6 +234,142 @@ class MTCNNUtil:
                 file_list.append(os.path.join(path,files[i]))
 
         return file_list
+
+    @staticmethod
+    def detect_face_12net(img, minsize, pnet, threshold, factor):
+
+        factor_count = 0
+        total_boxes = np.empty((0, 9))
+        h = img.shape[0]
+        w = img.shape[1]
+        minl = np.amin([h, w])
+        m = 12.0 / minsize
+        minl = minl * m
+        # creat scale pyramid
+        scales = []
+        while minl >= 12:
+            scales += [m * np.power(factor, factor_count)]
+            minl = minl * factor
+            factor_count += 1
+
+        # first stage
+        for j in range(len(scales)):
+            scale = scales[j]
+            hs = int(np.ceil(h * scale))
+            ws = int(np.ceil(w * scale))
+            im_data = cv2.resize(img, (hs, ws))
+            im_data = (im_data - 127.5) * (1. / 128.0)
+            img_x = np.expand_dims(im_data, 0)
+            out = pnet(img_x)
+            boxes = MTCNNUtil.genrate_bb(out,
+                                           scale,
+                                           threshold)
+
+            # inter-scale nms
+            pick = MTCNNUtil.nms(boxes.copy(), 0.5, 'Union')
+            if boxes.size > 0 and pick.size > 0:
+                boxes = boxes[pick, :]
+                total_boxes = np.append(total_boxes, boxes, axis=0)
+
+        numbox = total_boxes.shape[0]
+        if numbox > 0:
+            pick = MTCNNUtil.nms(total_boxes.copy(), 0.7, 'Union')
+            total_boxes = total_boxes[pick, :]
+            regw = total_boxes[:, 2] - total_boxes[:, 0]
+            regh = total_boxes[:, 3] - total_boxes[:, 1]
+            qq1 = total_boxes[:, 0] + total_boxes[:, 5] * regw
+            qq2 = total_boxes[:, 1] + total_boxes[:, 6] * regh
+            qq3 = total_boxes[:, 2] + total_boxes[:, 7] * regw
+            qq4 = total_boxes[:, 3] + total_boxes[:, 8] * regh
+            total_boxes = np.transpose(np.vstack([qq1, qq2, qq3, qq4,
+                                                  total_boxes[:, 4]]))
+            total_boxes[:, 0:4] = np.fix(total_boxes[:, 0:4]).astype(np.int32)
+        return total_boxes
+
+    @staticmethod
+    def detect_face_24net(img, minsize, pnet, rnet, threshold, factor):
+
+        factor_count = 0
+        total_boxes = np.empty((0, 9))
+        h = img.shape[0]
+        w = img.shape[1]
+        minl = np.amin([h, w])
+        m = 12.0 / minsize
+        minl = minl * m
+        # creat scale pyramid
+        scales = []
+        while minl >= 12:
+            scales += [m * np.power(factor, factor_count)]
+            minl = minl * factor
+            factor_count += 1
+
+        # first stage
+        for j in range(len(scales)):
+            scale = scales[j]
+            hs = int(np.ceil(h * scale))
+            ws = int(np.ceil(w * scale))
+            im_data = cv2.resize(img, (ws, hs))
+            im_data = (im_data - 127.5) * 0.0078125
+            img_x = np.expand_dims(im_data, 0)
+            out = pnet(img_x)
+            out0 = out[0]
+            out1 = out[1]
+            boxes, _ = MTCNNUtil.genrate_bb(out0[0, :, :, 1].copy(),
+                                           out1[0, :, :, :].copy(),
+                                           scale,
+                                           threshold[0])
+
+            # inter-scale nms
+            pick = nms(boxes.copy(), 0.5, 'Union')
+            if boxes.size > 0 and pick.size > 0:
+                boxes = boxes[pick, :]
+                total_boxes = np.append(total_boxes, boxes, axis=0)
+
+        numbox = total_boxes.shape[0]
+        if numbox > 0:
+            pick = nms(total_boxes.copy(), 0.7, 'Union')
+            total_boxes = total_boxes[pick, :]
+            regw = total_boxes[:, 2] - total_boxes[:, 0]
+            regh = total_boxes[:, 3] - total_boxes[:, 1]
+            qq1 = total_boxes[:, 0] + total_boxes[:, 5] * regw
+            qq2 = total_boxes[:, 1] + total_boxes[:, 6] * regh
+            qq3 = total_boxes[:, 2] + total_boxes[:, 7] * regw
+            qq4 = total_boxes[:, 3] + total_boxes[:, 8] * regh
+            total_boxes = np.transpose(np.vstack([qq1, qq2, qq3, qq4,
+                                                  total_boxes[:, 4]]))
+            total_boxes = rerec(total_boxes.copy())
+            total_boxes[:, 0:4] = np.fix(total_boxes[:, 0:4]).astype(np.int32)
+            dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph = pad(
+                total_boxes.copy(), w, h)
+
+        numbox = total_boxes.shape[0]
+        if numbox > 0:
+            # second stage
+            tempimg = np.zeros((24, 24, 3, numbox))
+            for k in range(0, numbox):
+                tmp = np.zeros((int(tmph[k]), int(tmpw[k]), 3))
+                tmp[dy[k] - 1:edy[k], dx[k] - 1:edx[k],
+                :] = img[y[k] - 1:ey[k], x[k] - 1:ex[k], :]
+                if (tmp.shape[0] > 0 and tmp.shape[1] > 0 or
+                        tmp.shape[0] == 0 and tmp.shape[1] == 0):
+                    tempimg[:, :, :, k] = imresample(tmp, (24, 24))
+                else:
+                    return np.empty()
+            tempimg = (tempimg - 127.5) * 0.0078125
+            tempimg1 = np.transpose(tempimg, (3, 0, 1, 2))
+            out = rnet(tempimg1)
+            out0 = np.transpose(out[0])
+            out1 = np.transpose(out[1])
+            score = out0[1, :]
+            ipass = np.where(score > threshold[1])
+            total_boxes = np.hstack([total_boxes[ipass[0], 0:4].copy(),
+                                     np.expand_dims(score[ipass].copy(), 1)])
+            mv = out1[:, ipass[0]]
+            if total_boxes.shape[0] > 0:
+                pick = nms(total_boxes, 0.5, 'Union')
+                total_boxes = total_boxes[pick, :]
+                total_boxes = bbreg(total_boxes.copy(), np.transpose(mv[:, pick]))
+        return total_boxes
 
 
 
