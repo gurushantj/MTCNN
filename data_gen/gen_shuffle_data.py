@@ -29,6 +29,8 @@ import argparse
 import numpy as np
 import cv2
 import numpy.random as npr
+
+from Constants import DATASET_SAVE_DIR, TRAINING_DATA_SOURCE_PATH
 from data_gen.tools import IoU
 
 def check_corners(box,co_ordinates):
@@ -53,9 +55,9 @@ def main(args):
 
     net = args.input_size
     anno_file = 'wider_face_train.txt'
-    im_dir = '/Users/gurushant/Downloads/WIDER_train/images'
+    im_dir = TRAINING_DATA_SOURCE_PATH
 
-    save_dir = '/Users/gurushant/Downloads/ds/native_' + str(net)
+    save_dir = DATASET_SAVE_DIR + str(net)
     pos_save_dir = save_dir + '/positive'
     part_save_dir = save_dir + '/part'
     neg_save_dir = save_dir + '/negative'
@@ -101,15 +103,11 @@ def main(args):
             crop_box = np.array([nx, ny, nx + size, ny + size])
 
             Iou = IoU(crop_box, boxes)
-            for box in boxes:
-                f = check_corners(box,crop_box)
-                if f == True:
-                    print("Found")
 
             cropped_im = img[ny: ny + size, nx: nx + size, :]
-            # resized_im = cv2.resize(cropped_im, (net, net),
-            #                         interpolation=cv2.INTER_LINEAR)
-            resized_im = cropped_im
+            resized_im = cv2.resize(cropped_im, (net, net),
+                                    interpolation=cv2.INTER_LINEAR)
+            # resized_im = cropped_im
 
             if np.max(Iou) < 0.1:
                 save_file = os.path.join(neg_save_dir, '%s.jpg' % n_idx)
@@ -150,9 +148,9 @@ def main(args):
                 offset_y2 = (y2 - ny2) / float(size)
 
                 cropped_im = img[ny1: ny2, nx1: nx2, :]
-                # resized_im = cv2.resize(cropped_im, (net, net),
-                #                         interpolation=cv2.INTER_LINEAR)
-                resized_im = cropped_im
+                resized_im = cv2.resize(cropped_im, (net, net),
+                                        interpolation=cv2.INTER_LINEAR)
+                # resized_im = cropped_im
 
                 box_ = box.reshape(1, -1)
                 if IoU(crop_box, box_) >= 0.65:

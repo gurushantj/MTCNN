@@ -1,6 +1,6 @@
 import os
 
-from Constants import TRAINING_DATA_SOURCE_PATH
+from Constants import *
 import numpy as np
 import cv2
 

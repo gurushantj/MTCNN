@@ -1,4 +1,4 @@
-from Constants import TRAINING_DATA_SOURCE_PATH
+from Constants import TRAINING_DATA_SOURCE_PATH, DATASET_SAVE_DIR
 from ONet import ONet
 from PNet import PNet
 import cv2
@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 from RNet import RNet
 from mtcnn_util.mtcnn_util import MTCNNUtil, Mode
-
+import os
 
 class MTCNNMain:
     def __init__(self,img_path,mode):
@@ -27,7 +27,7 @@ class MTCNNMain:
         if mode == Mode.TESTING.value:
             weight_data = MTCNNUtil.loadWeights("weights/mtcnn_pnet.npy")
             # MTCNNUtil.setWeights(weight_data,pnet.model)
-            pnet.model = tf.keras.models.load_model("/Users/gurushant/model/9000/12")
+            pnet.model = tf.keras.models.load_model("/Users/gurushant/model/2000/12")
 
             weight_data = MTCNNUtil.loadWeights("weights/mtcnn_rnet.npy")
             MTCNNUtil.setWeights(weight_data, rnet.model)
@@ -148,11 +148,40 @@ class MTCNNMain:
         return (im_data - 127.5) * (1. / 128.0)
 
     def generate_hard_12(self):
-        image_size = 24
         threshold = 0.6
         minsize = 20
         factor = 0.709
-        self.pnet_model.model = tf.keras.models.load_model("/Users/gurushant/model/9000/12")
+        self.pnet_model.model = tf.keras.models.load_model("/Users/gurushant/model/2000/12")
+        image_size = 24
+        save_dir = DATASET_SAVE_DIR+str(image_size)
+        anno_file = 'wider_face_train.txt'
+
+        neg_save_dir = save_dir + '/negative'
+        pos_save_dir = save_dir + '/positive'
+        part_save_dir = save_dir + '/part'
+        if not os.path.exists(save_dir):
+            os.mkdir(save_dir)
+        if not os.path.exists(pos_save_dir):
+            os.mkdir(pos_save_dir)
+        if not os.path.exists(part_save_dir):
+            os.mkdir(part_save_dir)
+        if not os.path.exists(neg_save_dir):
+            os.mkdir(neg_save_dir)
+
+        f1 = open(save_dir + '/pos_24.txt', 'w')
+        f2 = open(save_dir + '/neg_24.txt', 'w')
+        f3 = open(save_dir + '/part_24.txt', 'w')
+
+        with open(anno_file, 'r') as f:
+            annotations = f.readlines()
+        num = len(annotations)
+        print('%d pics in total' % num)
+
+        p_idx = 0  # positive
+        n_idx = 0  # negative
+        d_idx = 0  # dont care
+        image_idx = 0
+
 
         model = self.pnet_model.model
         with open("wider_face_train.txt","r") as file:
@@ -172,15 +201,65 @@ class MTCNNMain:
             # cv2.rectangle(img,(448,329),(570,478),(0,255,0),2)
             # cv2.imshow("test",img)
             # cv2.waitKey()
-            for box in boxes:
+            for box in rects:
                 box[box < 0] = 0
-                if (box[2]-box[0]) < image_size or (box[3]-box[1]) < image_size:
+                box = box.astype(np.int32)
+                # print(box[2]-box[0])
+                # print(box[3]-box[1])
+                if (box[2]-box[0]) < 15 or (box[3]-box[1]) < 15:
                     continue
-                iou = MTCNNUtil.iou(box,rects)
-                print(np.where(iou > threshold))
+                x_left, y_top, x_right, y_bottom, _ = box
+                crop_w = x_right - x_left + 1
+                crop_h = y_bottom - y_top + 1
+                # ignore box that is too small or beyond image border
+                if crop_w < image_size or crop_h < image_size:
+                    continue
 
+                iou = MTCNNUtil.iou(box,boxes)
+                cropped_im = img[y_top: y_bottom + 1, x_left: x_right + 1]
+                resized_im = cv2.resize(cropped_im,
+                                        (image_size, image_size),
+                                        interpolation=cv2.INTER_LINEAR)
+                # save negative images and write label
+                if np.max(iou) < 0.3:
+                    # Iou with all gts must below 0.3
+                    save_file = os.path.join(neg_save_dir,
+                                             '%s.jpg' % n_idx)
+                    f2.write('%s/negative/%s' %
+                             (save_dir, n_idx) + ' 0\n')
+                    cv2.imwrite(save_file, resized_im)
+                    n_idx += 1
+                else:
+                    # find gt_box with the highest iou
+                    idx = np.argmax(iou)
+                    assigned_gt = boxes[idx]
+                    x1, y1, x2, y2 = assigned_gt
 
+                    # compute bbox reg label
+                    offset_x1 = (x1 - x_left) / float(crop_w)
+                    offset_y1 = (y1 - y_top) / float(crop_h)
+                    offset_x2 = (x2 - x_right) / float(crop_w)
+                    offset_y2 = (y2 - y_bottom) / float(crop_h)
 
+                    if np.max(iou) >= 0.65:
+                        save_file = os.path.join(pos_save_dir,
+                                                 '%s.jpg' % p_idx)
+                        f1.write('%s/positive/%s' % (save_dir, p_idx) +
+                                 ' 1 %.2f %.2f %.2f %.2f\n' %
+                                 (offset_x1, offset_y1,
+                                  offset_x2, offset_y2))
+                        cv2.imwrite(save_file, resized_im)
+                        p_idx += 1
+
+                    elif np.max(iou) >= 0.4:
+                        save_file = os.path.join(part_save_dir,
+                                                 '%s.jpg' % d_idx)
+                        f3.write('%s/part/%s' % (save_dir, d_idx) +
+                                 ' -1 %.2f %.2f %.2f %.2f\n' %
+                                 (offset_x1, offset_y1,
+                                  offset_x2, offset_y2))
+                        cv2.imwrite(save_file, resized_im)
+                        d_idx += 1
 
 
     def draw_square(self,rectangle_list,save_path="."):
@@ -226,9 +305,12 @@ class MTCNNMain:
 
 
 
-path = "/Users/gurushant/Downloads/WIDER_train/images/4--Dancing/4_Dancing_Dancing_4_786.jpg"
+path = "/Users/gurushant/Downloads/WIDER_train/images/0--Parade/0_Parade_marchingband_1_849.jpg"
 m = MTCNNMain(path,mode=Mode.TESTING.value)
-# m.generate_hard_12()
-boxes = m.detect_faces()
-m.draw_square(boxes,save_path="/Users/gurushant/Desktop/band.jpg")
+m.generate_hard_12()
+# boxes = m.detect_faces()
+# if boxes.size == 0 :
+#     print("No face found")
+#     exit(100)
+# m.draw_square(boxes,save_path="/Users/gurushant/Desktop/band.jpg")
 # m.train_pnet("/mnt/disks/sdb/MTCNN/48")
