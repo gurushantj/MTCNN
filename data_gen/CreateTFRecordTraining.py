@@ -9,10 +9,6 @@ def createFeature(value):
 
 def createTFRecord(lines,startIndex,rowCount,rel_path,is_cls=True):
     records = []
-    # path = os.path.join(filePath,fileName)
-    # with open(path,"r") as file:
-    #     lines = file.readlines()
-    #     i = 0
     print("--------------------------------------------------------------->><<>")
     for j in range(startIndex, rowCount):
         line = lines[j]
@@ -47,11 +43,6 @@ def createTFRecord(lines,startIndex,rowCount,rel_path,is_cls=True):
             boundingBox = boundingBox.tostring()
 
         originalLabel = originalLabel.tostring()
-
-        # if boundingBox is None:
-        #     boundingBox = np.array([boundingBox[0],boundingBox[1],boundingBox[2],boundingBox[3]])
-        #     boundingBox = boundingBox.astype(np.float16)
-        #     boundingBox = boundingBox.tostring()
 
         image = tf.train.BytesList(value=[image])
         label = tf.train.BytesList(value=[originalLabel])
@@ -147,19 +138,3 @@ def generate_data_for_bb():
         index += 1
 
 generate_data_for_cls()
-# generate_data_for_bb()
-# total_files = 22
-# records_for_each_file = int(len(totalRecords)/total_files)
-#
-# for i in range(total_files):
-#     tfWriter = tf.io.TFRecordWriter("trainingData/48/dataset_{0}.tf".format(i))
-#     start_index = i*records_for_each_file
-#     end_index = start_index+records_for_each_file
-#     while start_index < end_index:
-#         record = totalRecords[start_index]
-#         tfWriter.write(record.SerializeToString())
-#         start_index +=1
-#     tfWriter.close()
-
-
-

@@ -312,22 +312,19 @@ class MTCNNUtil:
             im_data = (im_data - 127.5) * 0.0078125
             img_x = np.expand_dims(im_data, 0)
             out = pnet(img_x)
-            out0 = out[0]
-            out1 = out[1]
-            boxes, _ = MTCNNUtil.genrate_bb(out0[0, :, :, 1].copy(),
-                                           out1[0, :, :, :].copy(),
+            boxes, _ = MTCNNUtil.genrate_bb(out,
                                            scale,
                                            threshold[0])
 
             # inter-scale nms
-            pick = nms(boxes.copy(), 0.5, 'Union')
+            pick = MTCNNUtil.nms(boxes.copy(), 0.5, 'Union')
             if boxes.size > 0 and pick.size > 0:
                 boxes = boxes[pick, :]
                 total_boxes = np.append(total_boxes, boxes, axis=0)
 
         numbox = total_boxes.shape[0]
         if numbox > 0:
-            pick = nms(total_boxes.copy(), 0.7, 'Union')
+            pick = MTCNNUtil.nms(total_boxes.copy(), 0.7, 'Union')
             total_boxes = total_boxes[pick, :]
             regw = total_boxes[:, 2] - total_boxes[:, 0]
             regh = total_boxes[:, 3] - total_boxes[:, 1]
@@ -337,9 +334,8 @@ class MTCNNUtil:
             qq4 = total_boxes[:, 3] + total_boxes[:, 8] * regh
             total_boxes = np.transpose(np.vstack([qq1, qq2, qq3, qq4,
                                                   total_boxes[:, 4]]))
-            total_boxes = rerec(total_boxes.copy())
             total_boxes[:, 0:4] = np.fix(total_boxes[:, 0:4]).astype(np.int32)
-            dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph = pad(
+            dy, edy, dx, edx, y, ey, x, ex, tmpw, tmph = MTCNNUtil.pad(
                 total_boxes.copy(), w, h)
 
         numbox = total_boxes.shape[0]
@@ -352,7 +348,7 @@ class MTCNNUtil:
                 :] = img[y[k] - 1:ey[k], x[k] - 1:ex[k], :]
                 if (tmp.shape[0] > 0 and tmp.shape[1] > 0 or
                         tmp.shape[0] == 0 and tmp.shape[1] == 0):
-                    tempimg[:, :, :, k] = imresample(tmp, (24, 24))
+                    tempimg[:, :, :, k] = cv2.resize(tmp, (24, 24),interpolation=cv2.INTER_AREA)
                 else:
                     return np.empty()
             tempimg = (tempimg - 127.5) * 0.0078125
@@ -366,9 +362,9 @@ class MTCNNUtil:
                                      np.expand_dims(score[ipass].copy(), 1)])
             mv = out1[:, ipass[0]]
             if total_boxes.shape[0] > 0:
-                pick = nms(total_boxes, 0.5, 'Union')
+                pick = MTCNNUtil.nms(total_boxes, 0.5, 'Union')
                 total_boxes = total_boxes[pick, :]
-                total_boxes = bbreg(total_boxes.copy(), np.transpose(mv[:, pick]))
+                total_boxes = MTCNNUtil.bbreg(total_boxes.copy(), np.transpose(mv[:, pick]))
         return total_boxes
 
 
