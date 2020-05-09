@@ -383,7 +383,7 @@ class MTCNNMain:
         for rectangle in rectangle_list:
             cv2.rectangle(img, (int(rectangle[0]), int(rectangle[1])),
                           (int(rectangle[2]), int(rectangle[3])),
-                          (255, 0, 0), 2)
+                          (255, 0, 0), 1)
         cv2.imwrite(save_path, img)
 
 
