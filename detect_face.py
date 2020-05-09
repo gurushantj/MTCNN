@@ -1,7 +1,12 @@
 from main import MTCNNMain
+import sys
 
-img_path = "test_images/cricket.jpg"
-save_path = "test.jpg"
+if len(sys.argv) < 3:
+    print("python3 detect_face.py <input image path> <output image path>")
+    exit(1)
+
+img_path = sys.argv[1]
+save_path = sys.argv[2]
 m = MTCNNMain(img_path)
 boxes = m.detect_faces()
 m.draw_square(boxes,save_path=save_path)
