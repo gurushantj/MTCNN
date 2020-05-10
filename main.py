@@ -61,7 +61,7 @@ class MTCNNMain:
             out = self.pnet_model.model.predict(img_x)
             out0 = out[0]
             tmp = np.transpose(out0[0, :, :, 1])
-            boxes = MTCNNUtil.genrate_bb(out,threshold=0.9,scale=scale)
+            boxes = MTCNNUtil.genrate_bb(out,threshold=0.95,scale=scale)
             pick_indexes = MTCNNUtil.nms(boxes,threshold=0.5)
             if pick_indexes.size > 0:
                 boxes = boxes[pick_indexes,:]
@@ -406,19 +406,20 @@ class MTCNNMain:
 
 
 
+
 # m = MTCNNMain()
 # print("PNet training is started")
-# m.train_pnet()
+# m.train_pnet(DATASET_SAVE_DIR.format("12"))
 # print("PNet training is done")
 # print("Generating hard negatives of pnet")
 # m.generate_hard_negative_pnet_12()
 # print("Generated hard negatives of pnet")
 # print("RNet training is started")
-# m.train_rnet()
+# m.train_rnet(DATASET_SAVE_DIR.format("24"))
 # print("RNet training is done")
 # print("Generating hard negatives of rnet")
 # m.generate_hard_negative_24()
 # print("Generated hard negatives of rnet")
 # print("ONet training is started")
-# m.train_onet()
+# m.train_onet(DATASET_SAVE_DIR.format("48"))
 # print("ONet training is done")

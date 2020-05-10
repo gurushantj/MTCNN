@@ -3,6 +3,10 @@ import cv2
 import os
 import numpy as np
 import random
+import sys
+
+from Constants import DATASET_SAVE_DIR
+
 
 def createFeature(value):
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
@@ -58,14 +62,13 @@ def createTFRecord(lines,startIndex,rowCount,rel_path,is_cls=True):
         records.append(example)
     return records
 
+if len(sys.argv) < 1:
+    print("python3 data_gen/CreateTFRecordTraining.py <part>")
 
-rel_path = "/Users/gurushant/Downloads/ds/native_12"
-# rel_path = "/mnt/disks/sdb/MTCNN-Tensorflow/prepare_data/native_12"
-# rel_path = "/Users/gurushant/Downloads/ds/native_12"
-# rel_path_without_native = "/mnt/disks/sdb/MTCNN-Tensorflow/prepare_data/"
+part = sys.argv[1]
+rel_path = DATASET_SAVE_DIR.format(part)
 rel_path_without_native = ""
 
-part = "12"
 os.system("mkdir -p {0}".format(part))
 def generate_data_for_cls():
     files = [os.path.join(rel_path,"pos_{0}.txt".format(part)),
