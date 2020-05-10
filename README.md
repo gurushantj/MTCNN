@@ -28,7 +28,7 @@ This model is trained from scratch without using any pre trained weights , if yo
   </tr>
   <tr>
     <td>https://arxiv.org/pdf/1604.02878</td>
-    <td>NA</td>
+    <td>No</td>
   </tr>
   <tr>
     <td>https://github.com/wangbm/MTCNN-Tensorflow</td>
