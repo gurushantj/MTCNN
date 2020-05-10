@@ -18,9 +18,20 @@ Contains the implementation of the MTCNN paper excluding face key points.
 
 # Training
 This model is trained from scratch without using any pre trained weights.
-- Go to main.py and uncomment the fun call to run the training on(PNet/RNet/ONet).
+- Go to main.py and scroll down to bottom and uncomment the fun call to run the training on(PNet/RNet/ONet).
 
 # References
-https://arxiv.org/pdf/1604.02878
-
-https://github.com/wangbm/MTCNN-Tensorflow
+<table>
+  <tr>
+    <th>References</th>
+    <th>Modified</th>
+  </tr>
+  <tr>
+    <td>https://arxiv.org/pdf/1604.02878</td>
+    <td>NA</td>
+  </tr>
+  <tr>
+    <td>https://github.com/wangbm/MTCNN-Tensorflow</td>
+    <td>Modified</td>
+  </tr>
+</table>
