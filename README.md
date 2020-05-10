@@ -17,7 +17,7 @@ Contains the implementation of the MTCNN paper excluding face key points.
 <img src="https://github.com/gurushantj/MTCNN/blob/master/results/cricket_output.jpg?raw=true" alt="Smiley face" height="520" width="820">
 
 # Training
-This model is trained from scratch without using any pre trained weights.
+This model is trained from scratch without using any pre trained weights , if you wish you can initilize with the existing weights and train on your dataset.
 - Go to main.py and scroll down to bottom and uncomment the fun call to run the training on(PNet/RNet/ONet).
 
 # References
