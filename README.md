@@ -18,6 +18,7 @@ Contains the implementation of the MTCNN paper excluding face key points.
 
 # Training
 This model is trained from scratch without using any pre trained weights , if you wish you can initilize with the existing weights and train on your dataset.
+- Download Wider Face Training part only from <a target="_blank" href='http://mmlab.ie.cuhk.edu.hk/projects/WIDERFace/'> Official Website </a> and unzip at MTCNN/
 - python3 data_gen/gen_shuffle_data.py <size> # size could be 12 or 24 or 48 based upon the network to train
 - Run python3 data_gen/CreateTFRecordTraining.py # to generate the tf record file each containg 200k records
 - Go to main.py and scroll down to bottom and uncomment the fun call to run the training on(PNet/RNet/ONet).
