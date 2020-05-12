@@ -25,7 +25,8 @@ class MTCNNMain:
         self.img_path = img_path
         if init_with_wts:
             weight_data = MTCNNUtil.loadWeights("weights/mtcnn_pnet.npy")
-            MTCNNUtil.setWeights(weight_data,pnet.model)
+            # MTCNNUtil.setWeights(weight_data,pnet.model)
+            pnet.model = tf.keras.models.load_model("/Users/gurushant/model/2000/12")
             weight_data = MTCNNUtil.loadWeights("weights/mtcnn_rnet.npy")
             MTCNNUtil.setWeights(weight_data, rnet.model)
             weight_data = MTCNNUtil.loadWeights("weights/mtcnn_onet.npy")
@@ -63,7 +64,7 @@ class MTCNNMain:
             tmp = np.transpose(out0[0, :, :, 1])
             ll = np.where(tmp >= 0.8)
             # print(ll)
-            boxes = MTCNNUtil.genrate_bb(out,threshold=0.6,scale=scale)
+            boxes = MTCNNUtil.genrate_bb(out,threshold=0.8,scale=scale)
             pick_indexes = MTCNNUtil.nms(boxes,threshold=0.5)
             if pick_indexes.size > 0:
                 boxes = boxes[pick_indexes,:]
@@ -404,9 +405,9 @@ m = MTCNNMain()
 # print("PNet training is started")
 # m.train_pnet("/Users/gurushant/ds/")
 # print("PNet training is done")
-print("Generating hard negatives of pnet")
-m.generate_hard_negative_pnet_12(image_size=12)
-print("Generated hard negatives of pnet")
+# print("Generating hard negatives of pnet")
+# m.generate_hard_negative_pnet_12(image_size=12)
+# print("Generated hard negatives of pnet")
 # print("RNet training is started")
 # m.train_rnet(DATASET_SAVE_DIR.format("24"))
 # print("RNet training is done")
