@@ -62,11 +62,12 @@ def createTFRecord(lines,startIndex,rowCount,rel_path,is_cls=True):
         records.append(example)
     return records
 
-if len(sys.argv) < 1:
-    print("python3 data_gen/CreateTFRecordTraining.py <part>")
+if len(sys.argv) < 2:
+    print("Insufficient arguments. Follow 'python3 data_gen/CreateTFRecordTraining.py <part>'")
+    exit(0)
 
 part = sys.argv[1]
-rel_path = DATASET_SAVE_DIR.format(part)
+rel_path = DATASET_SAVE_DIR+part
 rel_path_without_native = ""
 
 os.system("mkdir -p {0}".format(part))
@@ -83,10 +84,9 @@ def generate_data_for_cls():
     random.shuffle(record_paths)
     total_records = len(record_paths)
 
-    per_file_record_count = 100
+    per_file_record_count = 200000
     rec_index =0
     index = 0
-    tf_record_path = "{0}/dataset_cls_{0}.tf".format(part)
     while rec_index < total_records:
         if rec_index+per_file_record_count > total_records:
             end_index = rec_index+per_file_record_count-total_records

@@ -54,7 +54,7 @@ def check_corners(box,co_ordinates):
 def main(args):
 
     net = args.input_size
-    anno_file = '../wider_face_train.txt'
+    anno_file = 'wider_face_train.txt'
     im_dir = TRAINING_DATA_SOURCE_PATH
 
     save_dir = DATASET_SAVE_DIR + str(net)
@@ -95,30 +95,30 @@ def main(args):
 
         height, width, channel = img.shape
 
+        neg_num = 0
+        while neg_num < 50:
+            size = npr.randint(40, min(width, height) / 2)
+            nx = npr.randint(0, width - size)
+            ny = npr.randint(0, height - size)
+            crop_box = np.array([nx, ny, nx + size, ny + size])
+
+            Iou = IoU(crop_box,boxes)
+
+            cropped_im = img[ny: ny + size, nx: nx + size, :]
+            resized_im = cv2.resize(cropped_im, (net, net),
+                                    interpolation=cv2.INTER_LINEAR)
+            # resized_im = cropped_im
+
+            if np.max(Iou) < 0.1:
+                save_file = os.path.join(neg_save_dir, '%s.jpg' % n_idx)
+                f2.write(save_dir + '/negative/%s' % n_idx + ' 0\n')
+                cv2.imwrite(save_file, resized_im)
+                n_idx += 1
+                neg_num += 1
+            print('%s images done, pos: %s part: %s neg: %s' %
+                  (idx, p_idx, d_idx, n_idx))
+
         for box in boxes:
-            neg_num = 0
-            while neg_num < 20:
-                size = npr.randint(40, min(width, height) / 2)
-                nx = npr.randint(0, width - size)
-                ny = npr.randint(0, height - size)
-                crop_box = np.array([nx, ny, nx + size, ny + size])
-
-                Iou = IoU(crop_box, np.reshape(box,(1,-1)))
-
-                cropped_im = img[ny: ny + size, nx: nx + size, :]
-                resized_im = cv2.resize(cropped_im, (net, net),
-                                        interpolation=cv2.INTER_LINEAR)
-                # resized_im = cropped_im
-
-                if np.max(Iou) < 0.1:
-                    save_file = os.path.join(neg_save_dir, '%s.jpg' % n_idx)
-                    f2.write(save_dir + '/negative/%s' % n_idx + ' 0\n')
-                    cv2.imwrite(save_file, resized_im)
-                    n_idx += 1
-                    neg_num += 1
-                print('%s images done, pos: %s part: %s neg: %s' %
-                      (idx, p_idx, d_idx, n_idx))
-
                 x1, y1, x2, y2 = box
                 w = x2 - x1 + 1
                 h = y2 - y1 + 1

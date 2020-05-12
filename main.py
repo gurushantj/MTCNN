@@ -9,7 +9,7 @@ from mtcnn_util.mtcnn_util import MTCNNUtil, Mode
 import os
 
 class MTCNNMain:
-    def __init__(self,img_path=None):
+    def __init__(self,img_path=None,init_with_wts = True):
         pnet = PNet()
         pnet.buildModel()
         self.pnet_model = pnet
@@ -23,13 +23,13 @@ class MTCNNMain:
 
         self.onet_model = onet
         self.img_path = img_path
-
-        weight_data = MTCNNUtil.loadWeights("weights/mtcnn_pnet.npy")
-        MTCNNUtil.setWeights(weight_data,pnet.model)
-        weight_data = MTCNNUtil.loadWeights("weights/mtcnn_rnet.npy")
-        MTCNNUtil.setWeights(weight_data, rnet.model)
-        weight_data = MTCNNUtil.loadWeights("weights/mtcnn_onet.npy")
-        MTCNNUtil.setWeights(weight_data, onet.model)
+        if init_with_wts:
+            weight_data = MTCNNUtil.loadWeights("weights/mtcnn_pnet.npy")
+            MTCNNUtil.setWeights(weight_data,pnet.model)
+            weight_data = MTCNNUtil.loadWeights("weights/mtcnn_rnet.npy")
+            MTCNNUtil.setWeights(weight_data, rnet.model)
+            weight_data = MTCNNUtil.loadWeights("weights/mtcnn_onet.npy")
+            MTCNNUtil.setWeights(weight_data, onet.model)
 
 
     def detect_faces(self,minsize=20,factor=0.7):
@@ -61,7 +61,9 @@ class MTCNNMain:
             out = self.pnet_model.model.predict(img_x)
             out0 = out[0]
             tmp = np.transpose(out0[0, :, :, 1])
-            boxes = MTCNNUtil.genrate_bb(out,threshold=0.95,scale=scale)
+            ll = np.where(tmp >= 0.8)
+            # print(ll)
+            boxes = MTCNNUtil.genrate_bb(out,threshold=0.6,scale=scale)
             pick_indexes = MTCNNUtil.nms(boxes,threshold=0.5)
             if pick_indexes.size > 0:
                 boxes = boxes[pick_indexes,:]
@@ -147,26 +149,13 @@ class MTCNNMain:
     def preprocess_image(self,im_data):
         return (im_data - 127.5) * (1. / 128.0)
 
-    def generate_hard_negative_pnet_12(self):
-        threshold = 0.6
-        minsize = 20
-        factor = 0.709
-        image_size = 12
-
+    def generate_hard_negative_pnet_12(self,image_size,threshold = 0.8,minsize = 20,factor = 0.709):
         save_dir = DATASET_SAVE_DIR+str(image_size)
         anno_file = 'wider_face_train.txt'
 
         neg_save_dir = save_dir + '/negative'
         pos_save_dir = save_dir + '/positive'
         part_save_dir = save_dir + '/part'
-        if not os.path.exists(save_dir):
-            os.mkdir(save_dir)
-        if not os.path.exists(pos_save_dir):
-            os.mkdir(pos_save_dir)
-        if not os.path.exists(part_save_dir):
-            os.mkdir(part_save_dir)
-        if not os.path.exists(neg_save_dir):
-            os.mkdir(neg_save_dir)
 
         f1 = open(save_dir + '/pos_{0}.txt'.format(image_size), 'a')
         f2 = open(save_dir + '/neg_{0}.txt'.format(image_size), 'a')
@@ -197,7 +186,9 @@ class MTCNNMain:
             rects = MTCNNUtil.detect_face_12net(img,minsize,pnet,threshold,factor)
             boxes = np.reshape(line[1:],newshape=(-1,4))
             boxes = boxes.astype(np.float64)
-            for box in rects:
+            max_boxes = np.minimum(50, rects.shape[0])
+            for nm in range(max_boxes):
+                box = rects[nm]
                 total += 1
                 box[box < 0] = 0
                 box = box.astype(np.int32)
@@ -388,8 +379,10 @@ class MTCNNMain:
 
 
     def train_pnet(self,path):
-        file_list = MTCNNUtil.get_files(path)
-        dataset_cls = self.pnet_model.readRecordDataSet(path=file_list)
+        cls_file_list = MTCNNUtil.get_files(path+"/cls")
+        # bb_file_list = MTCNNUtil.get_files(path + "/bb")
+        dataset_cls = self.pnet_model.readRecordDataSet(path=cls_file_list)
+        # dataset_bb = self.pnet_model.readRecordDataSet(path=bb_file_list)
         self.pnet_model.train(10000,dataset_cls,dataset_cls)
 
 
@@ -407,13 +400,13 @@ class MTCNNMain:
 
 
 
-# m = MTCNNMain()
+m = MTCNNMain()
 # print("PNet training is started")
-# m.train_pnet(DATASET_SAVE_DIR.format("12"))
+# m.train_pnet("/Users/gurushant/ds/")
 # print("PNet training is done")
-# print("Generating hard negatives of pnet")
-# m.generate_hard_negative_pnet_12()
-# print("Generated hard negatives of pnet")
+print("Generating hard negatives of pnet")
+m.generate_hard_negative_pnet_12(image_size=12)
+print("Generated hard negatives of pnet")
 # print("RNet training is started")
 # m.train_rnet(DATASET_SAVE_DIR.format("24"))
 # print("RNet training is done")
