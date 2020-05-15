@@ -86,15 +86,16 @@ class PNet:
         input = tf.image.random_flip_up_down(input)
         clsLabel = tf.reshape(clsLabel, [batch, 1, 1, 2])
         bbLabel = tf.reshape(bbLabel, [batch, 1, 1, 4])
-        mask = tf.not_equal(tf.reduce_sum(bbLabel, axis=-1), 0)
+        # mask = tf.not_equal(tf.reduce_sum(bbLabel, axis=-1), 0)
+        # mask = tf.reshape(mask,(-1,1))
 
         with tf.GradientTape() as tape:
             output = self.model(input)
-            output[1] = tf.boolean_mask(output[1], mask)
-            bbLabel = tf.boolean_mask(bbLabel, mask)
+            # output[1] = tf.boolean_mask(output[1], mask)
+            # bbLabel = tf.boolean_mask(bbLabel, mask)
 
             loss = tf.case([(tf.equal(trainPart, 0), lambda: self.crossEntropyLoss(clsLabel,output[0])),
-                            (tf.equal(trainPart, 1), lambda: self.meanSqrdLoss(output[1], bbLabel))
+                            (tf.equal(trainPart, 1), lambda: self.meanSqrdLoss(bbLabel,output[1]))
                             ], exclusive=True)
             clsLoss = tf.case(
                 [(tf.equal(trainPart, 0), lambda: loss + tf.cast(tf.add_n([losses[0], losses[1]]), dtype=tf.float32)),
@@ -131,7 +132,7 @@ class PNet:
         dataset = tf.data.Dataset.from_tensor_slices(path)
         dataset = dataset.interleave(lambda x: tf.data.TFRecordDataset(x),
                                      num_parallel_calls=tf.data.experimental.AUTOTUNE).cache()
-        dataset = dataset.shuffle(buffer_size=9216).batch(9216).prefetch(4).map(self._parseDataset,
+        dataset = dataset.shuffle(buffer_size=10240).batch(10240).prefetch(4).map(self._parseDataset,
                                                                                 num_parallel_calls=tf.data.experimental.AUTOTUNE).cache()
         return dataset
 
@@ -148,19 +149,45 @@ class PNet:
             self.bbLoss.reset_states()
             self.trainBBAcc.reset_states()
 
-            for image, label, boundingBoxLabel in dataset_cls:
+            cls_iter = iter(dataset_cls)
+            bb_iter = iter(dataset_bb)
+            is_cls_end = False
+            is_bb_end = False
+            indx = 0
+            while True:
                 randNum = np.random.randint(0, 2)
+                indx += 1
+                if randNum == 0 and is_cls_end == False:
+                    try:
+                        image, label, boundingBoxLabel = next(cls_iter)
+                    except StopIteration as exp:
+                        is_cls_end = True
+                elif is_bb_end == False and randNum == 1:
+                    try:
+                        image, label, boundingBoxLabel = next(bb_iter)
+                    except StopIteration as exp:
+                        is_bb_end = True
+
+                if is_cls_end == True and is_bb_end == True:
+                    break
+
+                if is_cls_end == True and randNum == 0:
+                    continue
+
+                if is_bb_end == True and randNum == 1:
+                    continue
+
                 batch_count += 1
                 start_epoch_time = time.time()
-                batch = image.shape[0]
                 l2 = self.model.get_layer("conv3").losses[0]
                 l3 = self.model.get_layer("conv4-1").losses[0]
                 l4 = self.model.get_layer("conv4-2").losses[0]
-                gradient = self.epoch(tf.constant(image), tf.constant(label), tf.constant(boundingBoxLabel),
+                self.epoch(tf.constant(image), tf.constant(label), tf.constant(boundingBoxLabel),
                                       tf.stack([l2, l3, l4]),
                                       tf.constant(randNum))
                 end_epoch_time = time.time()
                 epoch_execution_time += (end_epoch_time - start_epoch_time)
+
             data_reading_end_time = time.time()
             end = time.time()
 
@@ -186,3 +213,7 @@ class PNet:
             if i % 1000 == 0:
                 self.model.save(filepath="model/{0}/12".format(i))
                 self.model.save_weights(filepath="model_wts/{0}/12".format(i))
+
+        if i % 1000 == 0:
+            self.model.save(filepath="model/{0}/12".format(i))
+            self.model.save_weights(filepath="model_wts/{0}/12".format(i))

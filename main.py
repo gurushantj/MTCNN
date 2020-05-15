@@ -9,7 +9,7 @@ from mtcnn_util.mtcnn_util import MTCNNUtil, Mode
 import os
 
 class MTCNNMain:
-    def __init__(self,img_path=None):
+    def __init__(self,img_path=None,init_with_wts = True):
         pnet = PNet()
         pnet.buildModel()
         self.pnet_model = pnet
@@ -23,13 +23,14 @@ class MTCNNMain:
 
         self.onet_model = onet
         self.img_path = img_path
-
-        weight_data = MTCNNUtil.loadWeights("weights/mtcnn_pnet.npy")
-        MTCNNUtil.setWeights(weight_data,pnet.model)
-        weight_data = MTCNNUtil.loadWeights("weights/mtcnn_rnet.npy")
-        MTCNNUtil.setWeights(weight_data, rnet.model)
-        weight_data = MTCNNUtil.loadWeights("weights/mtcnn_onet.npy")
-        MTCNNUtil.setWeights(weight_data, onet.model)
+        if init_with_wts:
+            weight_data = MTCNNUtil.loadWeights("weights/mtcnn_pnet.npy")
+            # MTCNNUtil.setWeights(weight_data,pnet.model)
+            pnet.model = tf.keras.models.load_model("/Users/gurushant/model/1000/12")
+            weight_data = MTCNNUtil.loadWeights("weights/mtcnn_rnet.npy")
+            MTCNNUtil.setWeights(weight_data, rnet.model)
+            weight_data = MTCNNUtil.loadWeights("weights/mtcnn_onet.npy")
+            MTCNNUtil.setWeights(weight_data, onet.model)
 
 
     def detect_faces(self,minsize=20,factor=0.7):
@@ -61,7 +62,9 @@ class MTCNNMain:
             out = self.pnet_model.model.predict(img_x)
             out0 = out[0]
             tmp = np.transpose(out0[0, :, :, 1])
-            boxes = MTCNNUtil.genrate_bb(out,threshold=0.9,scale=scale)
+            ll = np.where(tmp >= 0.8)
+            # print(ll)
+            boxes = MTCNNUtil.genrate_bb(out,threshold=0.8,scale=scale)
             pick_indexes = MTCNNUtil.nms(boxes,threshold=0.5)
             if pick_indexes.size > 0:
                 boxes = boxes[pick_indexes,:]
@@ -92,7 +95,7 @@ class MTCNNMain:
                 :] = img[y[k] - 1:ey[k], x[k] - 1:ex[k], :]
                 if (tmp.shape[0] > 0 and tmp.shape[1] > 0 or
                         tmp.shape[0] == 0 and tmp.shape[1] == 0):
-                    tempimg[:, :, :, k] = cv2.resize(tmp, (24, 24))
+                    tempimg[:, :, :, k] = cv2.resize(tmp, (24, 24),interpolation=cv2.INTER_AREA)
                 else:
                     return np.empty()
             tempimg = (tempimg - 127.5) * 0.0078125
@@ -125,7 +128,7 @@ class MTCNNMain:
                 :] = img[y[k] - 1:ey[k], x[k] - 1:ex[k], :]
                 if (tmp.shape[0] > 0 and tmp.shape[1] > 0 or
                         tmp.shape[0] == 0 and tmp.shape[1] == 0):
-                    tempimg[:, :, :, k] = cv2.resize(tmp, (48, 48))
+                    tempimg[:, :, :, k] = cv2.resize(tmp, (48, 48),interpolation=cv2.INTER_AREA)
                 else:
                     return np.empty()
             tempimg = (tempimg - 127.5) * 0.0078125
@@ -147,26 +150,13 @@ class MTCNNMain:
     def preprocess_image(self,im_data):
         return (im_data - 127.5) * (1. / 128.0)
 
-    def generate_hard_negative_pnet_12(self):
-        threshold = 0.6
-        minsize = 20
-        factor = 0.709
-        image_size = 12
-
+    def generate_hard_negative_pnet_12(self,image_size,threshold = 0.8,minsize = 20,factor = 0.709):
         save_dir = DATASET_SAVE_DIR+str(image_size)
         anno_file = 'wider_face_train.txt'
 
         neg_save_dir = save_dir + '/negative'
         pos_save_dir = save_dir + '/positive'
         part_save_dir = save_dir + '/part'
-        if not os.path.exists(save_dir):
-            os.mkdir(save_dir)
-        if not os.path.exists(pos_save_dir):
-            os.mkdir(pos_save_dir)
-        if not os.path.exists(part_save_dir):
-            os.mkdir(part_save_dir)
-        if not os.path.exists(neg_save_dir):
-            os.mkdir(neg_save_dir)
 
         f1 = open(save_dir + '/pos_{0}.txt'.format(image_size), 'a')
         f2 = open(save_dir + '/neg_{0}.txt'.format(image_size), 'a')
@@ -197,7 +187,9 @@ class MTCNNMain:
             rects = MTCNNUtil.detect_face_12net(img,minsize,pnet,threshold,factor)
             boxes = np.reshape(line[1:],newshape=(-1,4))
             boxes = boxes.astype(np.float64)
-            for box in rects:
+            max_boxes = np.minimum(70, rects.shape[0])
+            for nm in range(max_boxes):
+                box = rects[nm]
                 total += 1
                 box[box < 0] = 0
                 box = box.astype(np.int32)
@@ -215,7 +207,7 @@ class MTCNNMain:
                 cropped_im = img[y_top: y_bottom + 1, x_left: x_right + 1]
                 resized_im = cv2.resize(cropped_im,
                                         (image_size, image_size),
-                                        interpolation=cv2.INTER_LINEAR)
+                                        interpolation=cv2.INTER_AREA)
                 # save negative images and write label
                 if np.max(iou) < 0.3:
                     # Iou with all gts must below 0.3
@@ -256,6 +248,10 @@ class MTCNNMain:
                                   offset_x2, offset_y2))
                         cv2.imwrite(save_file, resized_im)
                         d_idx += 1
+        print("Total hard positive {0}".format(p_idx))
+        print("Total hard negative {0}".format(n_idx))
+        print("Total hard part {0}".format(d_idx))
+
         f1.close()
         f2.close()
         f3.close()
@@ -324,7 +320,7 @@ class MTCNNMain:
                 cropped_im = img[y_top: y_bottom + 1, x_left: x_right + 1]
                 resized_im = cv2.resize(cropped_im,
                                         (image_size, image_size),
-                                        interpolation=cv2.INTER_LINEAR)
+                                        interpolation=cv2.INTER_AREA)
 
                 # save negative images and write label
                 if np.max(Iou) < 0.3:
@@ -380,16 +376,20 @@ class MTCNNMain:
         except Exception as exp:
             pass
         img = cv2.imread(self.img_path)
+        print("Total faces found {0}".format(len(rectangle_list)))
         for rectangle in rectangle_list:
             cv2.rectangle(img, (int(rectangle[0]), int(rectangle[1])),
                           (int(rectangle[2]), int(rectangle[3])),
                           (255, 0, 0), 1)
+
         cv2.imwrite(save_path, img)
 
 
     def train_pnet(self,path):
-        file_list = MTCNNUtil.get_files(path)
-        dataset_cls = self.pnet_model.readRecordDataSet(path=file_list)
+        cls_file_list = MTCNNUtil.get_files(path+"/cls")
+        # bb_file_list = MTCNNUtil.get_files(path + "/bb")
+        dataset_cls = self.pnet_model.readRecordDataSet(path=cls_file_list)
+        # dataset_bb = self.pnet_model.readRecordDataSet(path=bb_file_list)
         self.pnet_model.train(10000,dataset_cls,dataset_cls)
 
 
@@ -406,19 +406,20 @@ class MTCNNMain:
 
 
 
-# m = MTCNNMain()
+
+m = MTCNNMain()
 # print("PNet training is started")
-# m.train_pnet()
+# m.train_pnet("/Users/gurushant/ds/")
 # print("PNet training is done")
 # print("Generating hard negatives of pnet")
-# m.generate_hard_negative_pnet_12()
+m.generate_hard_negative_pnet_12(image_size=12)
 # print("Generated hard negatives of pnet")
 # print("RNet training is started")
-# m.train_rnet()
+# m.train_rnet(DATASET_SAVE_DIR.format("24"))
 # print("RNet training is done")
 # print("Generating hard negatives of rnet")
 # m.generate_hard_negative_24()
 # print("Generated hard negatives of rnet")
 # print("ONet training is started")
-# m.train_onet()
+# m.train_onet(DATASET_SAVE_DIR.format("48"))
 # print("ONet training is done")

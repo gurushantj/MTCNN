@@ -189,3 +189,7 @@ class ONet:
             if i % 1000 == 0:
                 self.model.save(filepath="model/{0}/48".format(i))
                 self.model.save_weights(filepath="model_wts/{0}/48".format(i))
+
+        if i % 1000 == 0:
+            self.model.save(filepath="model/{0}/12".format(i))
+            self.model.save_weights(filepath="model_wts/{0}/12".format(i))
